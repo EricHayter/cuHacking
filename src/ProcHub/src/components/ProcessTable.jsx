@@ -27,41 +27,33 @@ class Row {
   }
 }
 
-const row = {
-  id: 1,
-  pid: 40000,
-  name: "process",
-  cpuUsage: 10,
-  ramUsage: 1,
-  uptime: 1000,
-  user: "me",
-  suspendProc: "idk"
-};
-// const row = new Row(1000, "process", 10, 1, 1000, "me", "idk");
+const rows = [
+  new Row(1, "process", 11, 11, 1001, "me", "idk"), 
+  new Row(2, "process", 12, 12, 1002, "me", "idk"), 
+  new Row(3, "process", 13, 13, 1003, "me", "idk"), 
+  new Row(4, "process", 14, 14, 1004, "me", "idk"), 
+  new Row(5, "process", 15, 15, 1005, "me", "idk"), 
+  new Row(6, "process", 16, 16, 1006, "me", "idk"),
+  new Row(7, "process", 16, 16, 1006, "me", "idk"),
+  new Row(8, "process", 16, 16, 1006, "me", "idk"),
+  new Row(9, "process", 16, 16, 1006, "me", "idk"),
+  new Row(12, "process", 16, 16, 1006, "me", "idk"),
+  new Row(62, "process", 16, 16, 1006, "me", "idk"),
+  new Row(63, "process", 16, 16, 1006, "me", "idk"),
+  new Row(64, "process", 16, 16, 1006, "me", "idk"),
+  new Row(65, "process", 16, 16, 1006, "me", "idk"),
+  new Row(66, "process", 16, 16, 1006, "me", "idk"),
+  new Row(67, "process", 16, 16, 1006, "me", "idk"),
+]
 
-const rows = [row, row, row, row, row];
-//   new Row(1, "process", 10, 1, 1000, "me", "idk"), 
-//   new Row(2, "process", 10, 1, 1000, "me", "idk"), 
-//   new Row(3, "process", 10, 1, 1000, "me", "idk"), 
-//   new Row(4, "process", 10, 1, 1000, "me", "idk"), 
-//   new Row(5, "process", 10, 1, 1000, "me", "idk"), 
-//   new Row(6, "process", 10, 1, 1000, "me", "idk")
-// ]
-
-const paginationModel = { page: 0, pageSize: 5 };
+const paginationModel = { page: 0, pageSize: 30 };
 
 const ProcessTable = () => {
-  // const [rows, setRows] = useState([
-  //   new Row(1234, 'Process 1', '10%', '20MB', '1h', 'user1', 'No'),
-  //   new Row(5678, 'Process 2', '20%', '40MB', '2h', 'user2', 'Yes'),
-  //   new Row(9101, 'Process 3', '30%', '60MB', '3h', 'user3', 'No'),
-  // ]);
-  // const addRow = () => {
-  //   const newRow = new Process(1122, 'New Process', '25%', '50MB', '2h', 'user4', 'No');
-  //   setRows([...rows, newRow]);
-  // };
   return (
-      <Paper sx={{ height: 400, width: '100%' }}>
+      <Paper sx={{ 
+        height: 750,   
+        width: '100%',
+      }}>
         <DataGrid
           rows={rows}
           columns={columns}
@@ -75,4 +67,3 @@ const ProcessTable = () => {
 }
 
 export default ProcessTable;
-
