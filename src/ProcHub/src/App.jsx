@@ -4,7 +4,7 @@ import DashboardPage from './pages/DashboardPage';
 const App = () => {
   return (
     <div>
-      <DashboardPage />
+//      <DashboardPage />
 	  <p>Hello</p>
     </div>
   );
