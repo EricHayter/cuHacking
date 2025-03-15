@@ -1,25 +1,3 @@
-// import React from 'react';
-// import { AppBar, Toolbar, Typography, IconButton } from '@mui/material';
-// import MenuIcon from '@mui/icons-material/Menu';
-// import AccountBoxIcon from '@mui/icons-material/AccountBox';
-// import TextField from '@mui/material/TextField';
-
-// const Navbar = ({ onMenuClick }) => {
-//   return (
-//     <AppBar position="fixed">
-//       <Toolbar>
-//         <Typography variant="h6" sx={{ flexGrow: 1 }}>
-//           Dashboard
-//         </Typography>
-//         <TextField id="filled-basic" label="Search" variant="filled" />
-//         <AccountBoxIcon />
-//       </Toolbar>
-//     </AppBar>
-//   );
-// };
-
-// export default Navbar;
-
 import React, { useState } from 'react';
 import { styled, alpha } from '@mui/material/styles';
 import AppBar from '@mui/material/AppBar';
@@ -37,6 +15,7 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import MailIcon from '@mui/icons-material/Mail';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import MoreIcon from '@mui/icons-material/MoreVert';
+import SpeedIcon from '@mui/icons-material/Speed';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -166,8 +145,9 @@ const Navbar = () => {
             component="div"
             sx={{ display: { xs: 'none', sm: 'block' } }}
           >
-            Dashboard
+            RPM
           </Typography>
+          <img src="fire-speedometer.png" style={{height: 35, width: 'auto'}}/>
           <Search>
             <SearchIconWrapper>
               <SearchIcon />

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package process;
+
+message ProcessIdList {
+  repeated string process_ids = 1;  // List of process IDs (strings)
+}
+
