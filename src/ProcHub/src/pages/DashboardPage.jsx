@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
-import Sidebar from '../components/Sidebar';
 import DashboardContent from '../components/DashboardContent';
 
 const DashboardPage = () => {
@@ -13,7 +12,6 @@ const DashboardPage = () => {
   return (
     <div>
       <Navbar onMenuClick={handleMenuClick} />
-      <Sidebar />
       <DashboardContent />
     </div>
   );
