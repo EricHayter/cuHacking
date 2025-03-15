@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import ProcessTable from './ProcessTable';
 
 const DashboardContent = () => {
   return (
@@ -16,6 +17,7 @@ const DashboardContent = () => {
         Welcome to the Dashboard!
       </Typography>
       {/* Add additional content here */}
+	  <ProcessTable />
     </Box>
   );
 };
