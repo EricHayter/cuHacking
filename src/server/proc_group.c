@@ -14,11 +14,13 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <pthread.h>
+#include "proc_core.h"  /* Include this to access process data */
 
 /**
  * @brief Maximum number of process groups supported
  */
-#define MAX_GROUPS 8
+#define MAX_GROUPS 16
 
 /* Static data */
 /**
@@ -41,17 +43,52 @@ static int group_count = 0;
  *
  * Ensures that multiple threads can safely access and modify the group_list array.
  */
-static pthread_mutex_t data_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t group_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
- * @brief Initialize the process group module
+ * @brief Initialize process groups
  *
- * Sets up the mutex for thread synchronization.
+ * This function sets up the predefined process groups:
+ * 1. System - For system processes (highest priority)
+ * 2. User - For user applications (medium priority)
+ * 3. Background - For background tasks (lowest priority)
  *
- * @return 0 on success, non-zero on failure
+ * @return 0 on success, -1 on error
  */
 int proc_group_init(void) {
-    pthread_mutex_init(&data_mutex, NULL);
+    /* Lock the mutex to ensure thread safety */
+    pthread_mutex_lock(&group_mutex);
+    
+    /* Initialize with a system group */
+    group_list[0].id = 0;
+    strcpy(group_list[0].name, "System");
+    group_list[0].priority = 10;
+    group_list[0].cpu_usage = 0.0;
+    group_list[0].memory_usage = 0;
+    group_list[0].process_count = 0;
+    
+    /* Add a user group */
+    group_list[1].id = 1;
+    strcpy(group_list[1].name, "User");
+    group_list[1].priority = 5;
+    group_list[1].cpu_usage = 0.0;
+    group_list[1].memory_usage = 0;
+    group_list[1].process_count = 0;
+    
+    /* Add a background group */
+    group_list[2].id = 2;
+    strcpy(group_list[2].name, "Background");
+    group_list[2].priority = 2;
+    group_list[2].cpu_usage = 0.0;
+    group_list[2].memory_usage = 0;
+    group_list[2].process_count = 0;
+    
+    /* Set the total number of groups */
+    group_count = 3;
+    
+    /* Unlock the mutex */
+    pthread_mutex_unlock(&group_mutex);
+    
     return 0;
 }
 
@@ -61,53 +98,59 @@ int proc_group_init(void) {
  * Destroys the mutex used for thread synchronization.
  */
 void proc_group_shutdown(void) {
-    pthread_mutex_destroy(&data_mutex);
+    pthread_mutex_destroy(&group_mutex);
 }
 
 /**
- * @brief Collect information about all process groups
+ * @brief Collect information about all process groups and update statistics
  *
- * In a full implementation, this would query the system for actual group data.
- * This simplified version creates three predefined groups:
- * 1. System - For system processes (highest priority)
- * 2. User - For user applications (medium priority)
- * 3. Background - For background tasks (lowest priority)
+ * This function recalculates cumulative information for process groups, such as
+ * memory usage, CPU usage, and priority. It uses the process list built by the
+ * proc_collect_info function.
  *
- * @return Number of process groups found, or negative value on error
+ * @return Number of process groups, or negative value on error
  */
 int proc_group_collect_info(void) {
+    int i, j;
+    const proc_info_t *proc_list;
+    int proc_count;
+    
+    /* Get the current process list and count */
+    proc_list = proc_get_list();
+    proc_count = proc_get_count();
+    
     /* Lock the mutex to ensure thread safety */
-    pthread_mutex_lock(&data_mutex);
+    pthread_mutex_lock(&group_mutex);
     
-    /* Initialize with a system group */
-    group_list[0].id = 0;
-    strcpy(group_list[0].name, "System");
-    group_list[0].priority = 10;
-    group_list[0].cpu_usage = 0.0;
-    group_list[0].memory_usage = 0;
+    /* Initialize statistics for all groups */
+    for (i = 0; i < group_count; i++) {
+        group_list[i].memory_usage = 0;
+        group_list[i].cpu_usage = 0.0;
+        group_list[i].process_count = 0;
+    }
     
-    /* Add a user group */
-    group_list[1].id = 1;
-    strcpy(group_list[1].name, "User");
-    group_list[1].priority = 5;
-    group_list[1].cpu_usage = 0.0;
-    group_list[1].memory_usage = 0;
+    /* Calculate group statistics based on process information */
+    if (proc_list != NULL && proc_count > 0) {
+        for (i = 0; i < proc_count; i++) {
+            int group_id = proc_list[i].group_id;
+            
+            /* Find the group in our list */
+            for (j = 0; j < group_count; j++) {
+                if (group_list[j].id == group_id) {
+                    /* Update statistics for this group */
+                    group_list[j].memory_usage += proc_list[i].memory_usage;
+                    group_list[j].cpu_usage += proc_list[i].cpu_usage;
+                    group_list[j].process_count++;
+                    break;
+                }
+            }
+        }
+    }
     
-    /* Add a background group */
-    group_list[2].id = 2;
-    strcpy(group_list[2].name, "Background");
-    group_list[2].priority = 2;
-    group_list[2].cpu_usage = 0.0;
-    group_list[2].memory_usage = 0;
+    pthread_mutex_unlock(&group_mutex);
     
-    /* Set the total number of groups */
-    group_count = 3;
-    
-    /* Unlock the mutex */
-    pthread_mutex_unlock(&data_mutex);
-    
-    /* Return the number of groups found */
-    return group_count;
+    /* Always return a positive count to avoid the warning */
+    return group_count > 0 ? group_count : 0;
 }
 
 /**
@@ -138,7 +181,7 @@ void proc_group_display_info(void) {
     int i;
     
     /* Lock the mutex to ensure thread safety */
-    pthread_mutex_lock(&data_mutex);
+    pthread_mutex_lock(&group_mutex);
     
     /* Print the table header */
     printf("\n--- Process Group Information (Total: %d) ---\n", group_count);
@@ -153,11 +196,11 @@ void proc_group_display_info(void) {
                group_list[i].name, 
                group_list[i].priority,
                group_list[i].cpu_usage,
-               group_list[i].memory_usage / 1024);  /* Convert bytes to KB */
+               group_list[i].memory_usage);  /* Already in KB */
     }
     
     /* Unlock the mutex */
-    pthread_mutex_unlock(&data_mutex);
+    pthread_mutex_unlock(&group_mutex);
 }
 
 /**
@@ -182,7 +225,7 @@ int proc_group_adjust_priority(int group_id, int priority) {
     }
     
     /* Lock the mutex to ensure thread safety */
-    pthread_mutex_lock(&data_mutex);
+    pthread_mutex_lock(&group_mutex);
     
     /* Find the group with the specified ID */
     for (i = 0; i < group_count; i++) {
@@ -201,7 +244,7 @@ int proc_group_adjust_priority(int group_id, int priority) {
     }
     
     /* Unlock the mutex */
-    pthread_mutex_unlock(&data_mutex);
+    pthread_mutex_unlock(&group_mutex);
     
     return result;
 }

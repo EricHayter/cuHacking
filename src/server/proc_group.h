@@ -33,6 +33,7 @@ typedef struct {
     unsigned int priority;   /**< Priority level for the group (higher = more important) */
     double cpu_usage;        /**< Current CPU usage as a percentage */
     unsigned long memory_usage; /**< Current memory usage in bytes */
+    int process_count;       /**< Number of processes in the group */
 } process_group_t;
 
 /**
