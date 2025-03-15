@@ -2,6 +2,7 @@ import React from 'react'
 import { DataGrid } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button'
 
 
 const columns = [
@@ -11,8 +12,26 @@ const columns = [
   { field: 'ramUsage', headerName: 'ram usage', width: 130 },
   { field: 'uptime', headerName: 'uptime', width: 130 },
   { field: 'user', headerName: 'user', width: 50 },
-  { field: 'suspendProc', headerName: 'suspend', sortable: false, wdith: 45 },
+  { field: 'suspendProc', 
+	headerName: 'suspend',
+	sortable: false,
+	width: 45,
+    renderCell: (params) => (
+      <Button
+        variant="outlined"
+        color="error"
+        onClick={() => handleButtonClick(params.row.id)}
+      >
+        Suspend
+      </Button>
+    ),
+  },
 ];
+
+// Button click handler
+const handleButtonClick = (id) => {
+  alert(`I'm going to suspend proess with PID: ${id}`);
+};
 
 class Row {
   constructor(id, name, cpuUsage, ramUsage, uptime, user, suspendProc) {
