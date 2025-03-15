@@ -6,16 +6,16 @@ import Button from '@mui/material/Button'
 
 
 const columns = [
-  { field: 'pid', headerName: 'PID', width: 70 },
-  { field: 'name', headerName: 'name', width: 130 },
-  { field: 'cpuUsage', headerName: 'cpu usage', width: 130 },
-  { field: 'ramUsage', headerName: 'ram usage', width: 130 },
-  { field: 'uptime', headerName: 'uptime', width: 130 },
-  { field: 'user', headerName: 'user', width: 50 },
+  { field: 'pid', headerName: 'PID', flex: 0.2 },
+  { field: 'name', headerName: 'name', flex: 1 },
+  { field: 'cpuUsage', headerName: 'cpu usage', flex: 0.2 },
+  { field: 'ramUsage', headerName: 'ram usage', flex: 0.2 },
+  { field: 'uptime', headerName: 'uptime', flex: 0.7 },
+  { field: 'user', headerName: 'user', flex: 0.5 },
   { field: 'suspendProc', 
-	headerName: 'suspend',
-	sortable: false,
-	width: 45,
+    headerName: 'suspend',
+    sortable: false,
+    width: 45,
     renderCell: (params) => (
       <Button
         variant="outlined"
@@ -25,7 +25,8 @@ const columns = [
         Suspend
       </Button>
     ),
-  },
+    flex: 0.3
+    },
 ];
 
 // Button click handler
