@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
-import DashboardContent from '../components/DashboardContent';
+import ProcessTable from '../components/ProcessTable';
 
 const DashboardPage = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -12,7 +12,7 @@ const DashboardPage = () => {
   return (
     <div>
       <Navbar onMenuClick={handleMenuClick} />
-      <DashboardContent />
+      <ProcessTable />
     </div>
   );
 };
