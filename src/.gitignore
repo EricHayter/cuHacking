@@ -1,1 +1,19 @@
-ProcHub/node_modules
+# Node.js
+**/node_modules/
+**/package-lock.json
+**/yarn.lock
+
+
+
+# QNX specific
+**/proc-monitor
+**/*.o
+**/*.so
+**/*.a
+
+# OS specific
+.DS_Store
+**/.DS_Store
+**/Thumbs.db
+
+
