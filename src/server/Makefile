@@ -17,7 +17,19 @@ DOCKER_IMAGE = qnx800:latest
 # Project files
 # ------------
 # Source files to compile
-SRCS = proc-monitor.c proc_core.c proc_group.c
+SRCS = proc-monitor.c proc_core.c proc_group.c socket_server.c proc_history.c
+
+# Compiler flags
+# -------------
+CFLAGS = -D__QNXNTO__ -Wall -Wextra
+INCLUDES = -I. \
+          -I$(QNX_TARGET)/usr/include \
+          -I$(QNX_TARGET)/usr/include/aarch64 \
+          -I$(QNX_TARGET)/usr/include/aarch64/le
+
+# Libraries
+# --------
+LIBS = -lsocket
 
 # Default target: checks if container is running and starts it if needed
 # ---------------------------------------------------------------------
@@ -58,11 +70,8 @@ build-in-container:
 	@echo "Using QNX compiler directly with full paths"
 	QNX_CONFIGURATION="$${QNX_CONFIGURATION:-$${QNX_TARGET}/etc/qconfig}" \
 	$(QNX_HOST)/usr/bin/ntoaarch64-gcc \
-		-D__QNXNTO__ -Wall -Wextra \
-		-I$(QNX_TARGET)/usr/include \
-		-I$(QNX_TARGET)/usr/include/aarch64 \
-		-I$(QNX_TARGET)/usr/include/aarch64/le \
-		-o proc-monitor $(SRCS) -I.
+		$(CFLAGS) $(INCLUDES) \
+		-o proc-monitor $(SRCS) $(LIBS)
 
 # Build QNX image
 # --------------
