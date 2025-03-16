@@ -42,7 +42,6 @@ const columns = [
     },
 ];
 
-// Button click handler
 const handleButtonClick = (id) => {
   alert(`I'm going to suspend proess with PID: ${id}`);
 };
@@ -89,35 +88,19 @@ const ProcessTable = () => {
   const generateNew = () => Math.floor(Math.random() * 100);
 
   const updateData = () => {
-    // Create a new data array with the random value
     setData(prevData => {
-      // Make a copy of the previous data
       const newData = [...prevData];
-
-      // // Get the last entry's index and update the value with a random number
-      // const lastIndex = newData.length - 1;
-      // newData[lastIndex] = {
-      //   ...newData[lastIndex],
-      //   CPU_Usage: generateNew(),
-      // };
-
-      // // Shift the array (optional to simulate new data coming in) if needed
-      // // Add a new entry to the data (if you want to keep appending)
-      // const newName = 'newtime';
       newData.shift();
       newData.push({ time: 'newtime', CPU_Usage: generateNew() });
-      
-
       return newData;
     });
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      updateData(); // Update data every 3 seconds
+      updateData(); 
     }, 3000);
 
-    // Cleanup interval when the component is unmounted
     return () => clearInterval(interval);
   }, []);
 
