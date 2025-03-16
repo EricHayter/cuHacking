@@ -18,6 +18,11 @@ const cpuData = [
   { time: 'time10', CPU_Usage: 5 },
 ];
 
+const getCurrentTime = () => {
+  const now = new Date();
+  return now.toLocaleTimeString();  // Formats as "HH:MM:SS"
+};
+
 const columns = [
   { field: 'pid', headerName: 'PID', flex: 0.2 },
   { field: 'name', headerName: 'Name', flex: 1 },
@@ -86,13 +91,16 @@ const ProcessTable = () => {
   const [data, setData] = useState(cpuData);
 
   const generateNew = () => Math.floor(Math.random() * 100);
+  
 
   const updateData = () => {
+    const newTime = getCurrentTime(); // Get current time in HH:mm:ss format
+    const newData = { time: newTime, CPU_Usage: generateNew() };
     setData(prevData => {
-      const newData = [...prevData];
-      newData.shift();
-      newData.push({ time: 'newtime', CPU_Usage: generateNew() });
-      return newData;
+      const updatedData = [...prevData, newData];
+      updatedData.shift();
+      // newData.push(newEntry);
+      return updatedData;
     });
   };
 
@@ -128,7 +136,7 @@ const ProcessTable = () => {
         <Dialog open={open} onClose={handleClose} fullScreen>
         <DialogTitle>Process Details</DialogTitle>
           <ResponsiveContainer width="100%" height="50%">
-            <LineChart data={data}>
+            <LineChart data={data} isAnimationActive={false}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" />
               <YAxis domain={[0, 100]}/>
