@@ -1,5 +1,5 @@
 /**
- * socket_server.c - Simple socket server implementation
+ * socket_server.c - Improved socket server implementation with robust JSON handling
  */
 
 #include <stdio.h>
@@ -12,31 +12,42 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <ctype.h>
 #include "socket_server.h"
 #include "proc_core.h"
 #include "proc_history.h"
 
+/* Configuration settings */
 #define MAX_CLIENTS 30
 #define BUFFER_SIZE 4096
 #define JSON_BUFFER_SIZE 8192
 
+/* Static variables */
 static int server_fd = -1;
 static int client_sockets[MAX_CLIENTS];
 static int num_clients = 0;
 static volatile int running = 1;
 
-// Initialize all client sockets to 0
+/* Used to prevent compiler warning about unused parameters */
+#define UNUSED_PARAM(x) (void)(x)
+
+/**
+ * Initialize all client sockets to 0
+ */
 static void init_client_sockets() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         client_sockets[i] = 0;
     }
 }
 
-// Helper function to escape JSON strings
+/**
+ * Helper function to escape JSON strings
+ * Properly handles quotes and backslashes in strings to ensure valid JSON
+ */
 static void json_escape_string(char *dest, const char *src, size_t dest_size) {
     size_t i, j;
     for (i = 0, j = 0; src[i] && j < dest_size - 1; i++) {
-        if (src[i] == '"' || src[i] == '\\') {
+        if (src[i] == '"' || src[i] == '\\' || src[i] == '/') {
             if (j < dest_size - 2) {
                 dest[j++] = '\\';
                 dest[j++] = src[i];
@@ -46,6 +57,19 @@ static void json_escape_string(char *dest, const char *src, size_t dest_size) {
                 dest[j++] = '\\';
                 dest[j++] = 'n';
             }
+        } else if (src[i] == '\r') {
+            if (j < dest_size - 2) {
+                dest[j++] = '\\';
+                dest[j++] = 'r';
+            }
+        } else if (src[i] == '\t') {
+            if (j < dest_size - 2) {
+                dest[j++] = '\\';
+                dest[j++] = 't';
+            }
+        } else if (src[i] < 32) {
+            // Skip control characters
+            continue;
         } else {
             dest[j++] = src[i];
         }
@@ -53,13 +77,20 @@ static void json_escape_string(char *dest, const char *src, size_t dest_size) {
     dest[j] = '\0';
 }
 
-// Handle GetProcesses request
+/**
+ * Builds a JSON response for the GetProcesses request
+ * Returns a dynamically allocated string that must be freed by the caller
+ */
 static char* handle_get_processes() {
     char *response = malloc(JSON_BUFFER_SIZE);
-    if (!response) return NULL;
+    if (!response) {
+        perror("Failed to allocate memory for response");
+        return NULL;
+    }
     
     // Start JSON object with request_type
-    int offset = snprintf(response, JSON_BUFFER_SIZE, "{\"request_type\":\"%s\",\"pids\":[", MSG_GET_PROCESSES);
+    int offset = snprintf(response, JSON_BUFFER_SIZE, 
+                         "{\"request_type\":\"%s\",\"pids\":[", MSG_GET_PROCESSES);
     
     // Get actual process information
     if (proc_collect_info() >= 0) {
@@ -67,7 +98,7 @@ static char* handle_get_processes() {
         int proc_count = proc_get_count();
         
         // Add each PID to the array
-        for (int i = 0; i < proc_count; i++) {
+        for (int i = 0; i < proc_count && offset < JSON_BUFFER_SIZE - 20; i++) {
             int remaining = JSON_BUFFER_SIZE - offset;
             int written;
             if (i < proc_count - 1) {
@@ -76,26 +107,36 @@ static char* handle_get_processes() {
                 written = snprintf(response + offset, remaining, "%d", proc_list[i].pid);
             }
             if (written >= remaining) {
-                // Buffer full, truncate
+                // Buffer almost full, truncate the array and leave room for closing brackets
+                offset -= (i > 0 ? 1 : 0); // Remove trailing comma if any
                 break;
             }
             offset += written;
         }
     }
     
-    // Close JSON object
+    // Close JSON object - ensure we don't overflow
     snprintf(response + offset, JSON_BUFFER_SIZE - offset, "]}");
     return response;
 }
 
-// Handle GetSimpleProcessDetails request
+/**
+ * Builds a JSON response for the GetSimpleProcessDetails request
+ * Returns a dynamically allocated string that must be freed by the caller
+ */
 static char* handle_simple_process_details(int pid) {
     char *response = malloc(JSON_BUFFER_SIZE);
-    char name_escaped[256];
-    if (!response) return NULL;
+    if (!response) {
+        perror("Failed to allocate memory for response");
+        return NULL;
+    }
+    
+    char name_escaped[256] = "Unknown";
     
     // Start with request_type and pid
-    snprintf(response, JSON_BUFFER_SIZE, "{\"request_type\":\"%s\",\"pid\":%d", MSG_GET_SIMPLE_DETAILS, pid);
+    int offset = snprintf(response, JSON_BUFFER_SIZE, 
+                     "{\"request_type\":\"%s\",\"pid\":%d", 
+                     MSG_GET_SIMPLE_DETAILS, pid);
     
     // Get actual process information
     if (proc_collect_info() >= 0) {
@@ -117,25 +158,38 @@ static char* handle_simple_process_details(int pid) {
                                        (pid <= 1000) ? "User" : "Background";
                 
                 // Add process details
-                snprintf(response + strlen(response), JSON_BUFFER_SIZE - strlen(response),
+                int remaining = JSON_BUFFER_SIZE - offset;
+                int written = snprintf(response + offset, remaining,
                     ",\"name\":\"%s\",\"user\":\"%s\",\"uptime\":%lu,"
                     "\"cpu_usage\":%.2f,\"ram_usage\":%lu",
                     name_escaped, user_group, uptime,
                     proc_list[i].cpu_usage, proc_list[i].memory_usage);
+                
+                if (written >= remaining) {
+                    // Buffer full, truncate the response
+                    break;
+                }
+                offset += written;
                 break;
             }
         }
     }
     
     // Close JSON object
-    strcat(response, "}");
+    snprintf(response + offset, JSON_BUFFER_SIZE - offset, "}");
     return response;
 }
 
-// Handle GetDetailedProcessDetails request
+/**
+ * Builds a JSON response for the GetDetailedProcessDetails request
+ * Returns a dynamically allocated string that must be freed by the caller
+ */
 static char* handle_detailed_process_details(int pid) {
     char *response = malloc(JSON_BUFFER_SIZE);
-    if (!response) return NULL;
+    if (!response) {
+        perror("Failed to allocate memory for response");
+        return NULL;
+    }
     
     // Start JSON object with request_type and pid
     int offset = snprintf(response, JSON_BUFFER_SIZE, 
@@ -158,17 +212,18 @@ static char* handle_detailed_process_details(int pid) {
                 int entry_count = proc_history_get_entries(pid, history_entries, MAX_HISTORY_ENTRIES);
                 
                 // Add all historical entries to the response
-                for (int j = 0; j < entry_count; j++) {
+                for (int j = 0; j < entry_count && offset < JSON_BUFFER_SIZE - 100; j++) {
                     int remaining = JSON_BUFFER_SIZE - offset;
                     int written = snprintf(response + offset, remaining,
-                        "%s{\"cpu_usage\":%.2f,\"ram_usage\":%lu,\"timestamp\":%ld}",
+                        "%s{\"cpu_usage\":%.2f,\"memory_usage\":%lu,\"timestamp\":%ld}",
                         j > 0 ? "," : "",
                         history_entries[j].cpu_usage,
                         history_entries[j].memory_usage,
                         (long)history_entries[j].timestamp);
                     
                     if (written >= remaining) {
-                        // Buffer full, truncate
+                        // Buffer almost full, truncate and ensure valid JSON
+                        offset -= (j > 0 ? 1 : 0); // Remove trailing comma if any
                         break;
                     }
                     offset += written;
@@ -183,10 +238,16 @@ static char* handle_detailed_process_details(int pid) {
     return response;
 }
 
-// Handle SuspendProcess request
+/**
+ * Builds a JSON response for the SuspendProcess request
+ * Returns a dynamically allocated string that must be freed by the caller
+ */
 static char* handle_suspend_process(int pid) {
     char *response = malloc(JSON_BUFFER_SIZE);
-    if (!response) return NULL;
+    if (!response) {
+        perror("Failed to allocate memory for response");
+        return NULL;
+    }
     
     // Attempt to suspend the process
     int success = (proc_adjust_priority(pid, 0, 0) == 0);
@@ -198,8 +259,54 @@ static char* handle_suspend_process(int pid) {
     return response;
 }
 
-// Process incoming message
+/**
+ * Validates that a string is valid JSON
+ * Returns 1 if valid, 0 if invalid
+ */
+static int is_valid_json(const char *json) {
+    if (!json || *json != '{') return 0;
+    
+    int braces = 0;
+    int in_string = 0;
+    int escaped = 0;
+    
+    for (const char *p = json; *p; p++) {
+        if (escaped) {
+            escaped = 0;
+            continue;
+        }
+        
+        if (*p == '\\' && in_string) {
+            escaped = 1;
+            continue;
+        }
+        
+        if (*p == '"' && !escaped) {
+            in_string = !in_string;
+            continue;
+        }
+        
+        if (!in_string) {
+            if (*p == '{') braces++;
+            else if (*p == '}') braces--;
+            
+            if (braces < 0) return 0; // Unbalanced braces
+        }
+    }
+    
+    return (braces == 0 && !in_string);
+}
+
+/**
+ * Process incoming message, parse JSON and execute appropriate action
+ */
 static void process_message(int client_socket, const char* message) {
+    // First, check if the message is valid JSON
+    if (!is_valid_json(message)) {
+        printf("Invalid JSON message received: %s\n", message);
+        return;
+    }
+    
     // Simple JSON parsing
     char *request_type = NULL;
     int pid = -1;
@@ -246,12 +353,22 @@ static void process_message(int client_socket, const char* message) {
     }
     
     if (response) {
-        socket_server_send(client_socket, response);
+        // Validate the response before sending
+        if (is_valid_json(response)) {
+            socket_server_send(client_socket, response);
+        } else {
+            printf("Error: Generated invalid JSON response: %s\n", response);
+        }
         free(response);
     }
 }
 
-static void* socket_thread(void* UNUSED_arg) {
+/**
+ * Main socket server thread handling client connections
+ */
+static void* socket_thread(void* arg) {
+    UNUSED_PARAM(arg);
+    
     fd_set read_fds;
     int max_sd, activity, new_socket, valread;
     char buffer[BUFFER_SIZE];
@@ -271,7 +388,7 @@ static void* socket_thread(void* UNUSED_arg) {
             }
         }
         
-        struct timeval tv = {1, 0};
+        struct timeval tv = {1, 0}; // 1 second timeout
         activity = select(max_sd + 1, &read_fds, NULL, NULL, &tv);
         
         if (activity < 0) {
@@ -299,7 +416,7 @@ static void* socket_thread(void* UNUSED_arg) {
             int sd = client_sockets[i];
             
             if (FD_ISSET(sd, &read_fds)) {
-                if ((valread = read(sd, buffer, BUFFER_SIZE)) == 0) {
+                if ((valread = read(sd, buffer, BUFFER_SIZE - 1)) == 0) {
                     close(sd);
                     client_sockets[i] = 0;
                     num_clients--;
@@ -315,6 +432,9 @@ static void* socket_thread(void* UNUSED_arg) {
     return NULL;
 }
 
+/**
+ * Initialize and start the socket server
+ */
 int socket_server_init(int port) {
     struct sockaddr_in address;
     pthread_t thread_id;
@@ -361,11 +481,17 @@ int socket_server_init(int port) {
     return 0;
 }
 
+/**
+ * Send a message to a client socket
+ */
 int socket_server_send(int client_socket, const char* message) {
     if (!message) return -1;
     return send(client_socket, message, strlen(message), 0);
 }
 
+/**
+ * Broadcast a message to all connected clients
+ */
 void socket_server_broadcast(const char* message) {
     if (!message) return;
     
@@ -376,6 +502,9 @@ void socket_server_broadcast(const char* message) {
     }
 }
 
+/**
+ * Shut down the socket server
+ */
 void socket_server_shutdown() {
     running = 0;
     

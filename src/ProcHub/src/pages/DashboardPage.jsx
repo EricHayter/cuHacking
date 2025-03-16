@@ -13,7 +13,7 @@ const DashboardPage = () => {
     // Connect to the WebSocket proxy instead of directly to TCP server
     // This connects to our local proxy which bridges to the TCP server
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8888`;
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:7654`;
     
     console.log(`Connecting to WebSocket proxy at: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
@@ -83,9 +83,9 @@ const DashboardPage = () => {
                 [receivedData.pid]: {
                   pid: receivedData.pid,
                   name: receivedData.name || "Unknown",
-                  cpu_usage: receivedData.cpu_usage || 0,
-                  ram_usage: receivedData.ram_usage || 0,
-                  uptime: receivedData.uptime || 0,
+                  cpu_usage: receivedData.cpu_usage !== undefined ? receivedData.cpu_usage : 0,
+                  ram_usage: receivedData.ram_usage !== undefined ? receivedData.ram_usage : 0,
+                  uptime: receivedData.uptime !== undefined ? receivedData.uptime : 0,
                   user: receivedData.user || "Unknown"
                 }
               }));

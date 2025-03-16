@@ -1,8 +1,8 @@
 /**
- * Advanced TCP to WebSocket Proxy Server for ProcHub
+ * Improved TCP to WebSocket Proxy Server for ProcHub
  * 
- * This server acts as a bridge between the browser (WebSocket) and the QNX process monitor (TCP)
- * with enhanced protocol handling and debugging.
+ * This enhanced server fixes JSON parsing issues between the browser (WebSocket)
+ * and the QNX process monitor (TCP server).
  */
 
 import express from 'express';
@@ -24,6 +24,7 @@ const TCP_PORT = 8000;
 // Add reconnection settings
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 3000; // 3 seconds
+const RESPONSE_TIMEOUT = 5000; // 5 seconds timeout for responses
 
 // Serve the static frontend files
 app.use(express.static('dist'));
@@ -31,20 +32,65 @@ app.use(express.static('dist'));
 // Store active TCP connections
 const connections = new Map();
 
-// Known QNX handshake patterns
+// Known QNX handshake patterns (as buffer patterns)
 const HANDSHAKE_PATTERNS = [
   Buffer.from('QCONN\r\n'),
   Buffer.from([0xFF, 0xFD, 0x22])
 ];
 
 // Check if a buffer contains one of the known handshake patterns
-function isHandshakeBuffer(buffer) {
+function isHandshakeMessage(buffer) {
   return HANDSHAKE_PATTERNS.some(pattern => {
     if (buffer.length < pattern.length) return false;
     for (let i = 0; i < pattern.length; i++) {
       if (buffer[i] !== pattern[i]) return false;
     }
     return true;
+  });
+}
+
+// Format buffer for logging
+function formatBufferForLog(buffer) {
+  const text = buffer.toString();
+  return `Text data: ${text}`;
+}
+
+// Check if data appears to be binary
+function isBinaryData(buffer) {
+  // Check first few bytes for common binary patterns
+  return buffer.some(byte => byte < 32 && ![9, 10, 13].includes(byte));
+}
+
+// Try to parse JSON safely
+function tryParseJSON(str) {
+  try {
+    const obj = JSON.parse(str);
+    return obj;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Safe write to TCP socket with timeout and error handling
+function safeTcpWrite(tcpClient, data, timeout = RESPONSE_TIMEOUT) {
+  return new Promise((resolve, reject) => {
+    if (!tcpClient || tcpClient.destroyed) {
+      reject(new Error('TCP client not available'));
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Write operation timed out'));
+    }, timeout);
+
+    tcpClient.write(data, (err) => {
+      clearTimeout(timeoutId);
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
   });
 }
 
@@ -55,6 +101,9 @@ wss.on('connection', (ws) => {
   let reconnectAttempts = 0;
   let tcpClient = null;
   let handshakeComplete = false;
+  let dataBuffer = Buffer.alloc(0); // Buffer for accumulating data
+  let lastRequestTime = 0;
+  let pendingResponse = false;
   
   // Function to create TCP connection with retry logic
   const connectToTcpServer = () => {
@@ -63,6 +112,10 @@ wss.on('connection', (ws) => {
       console.log('Connected to TCP server');
       reconnectAttempts = 0; // Reset attempts on successful connection
       handshakeComplete = false;
+      dataBuffer = Buffer.alloc(0); // Reset data buffer
+      
+      // Set keep-alive to detect connection drops
+      tcpClient.setKeepAlive(true, 1000);
     });
     
     // Store this connection
@@ -72,20 +125,19 @@ wss.on('connection', (ws) => {
     // Handle TCP data and forward to WebSocket
     tcpClient.on('data', (data) => {
       try {
-        // Log reception
-        console.log(`Received from TCP [${data.length} bytes]`);
+        console.log(`Received from TCP [${data.length} bytes]: ${formatBufferForLog(data)}`);
         
-        // Check for known handshake patterns
-        if (!handshakeComplete && isHandshakeBuffer(data)) {
-          console.log('Detected QNX handshake message:', data);
+        // Check for handshake patterns
+        if (!handshakeComplete && isHandshakeMessage(data)) {
+          console.log('Detected QNX handshake message');
           handshakeComplete = true;
           
-          // Initialize the connection with a GetProcesses request
-          setTimeout(() => {
+          // Initialize the connection with a GetProcesses request after a short delay
+          setTimeout(async () => {
             try {
               const initCommand = JSON.stringify({ request_type: "GetProcesses" });
               console.log('Sending initialization command:', initCommand);
-              tcpClient.write(initCommand);
+              await safeTcpWrite(tcpClient, initCommand);
             } catch (err) {
               console.error('Error sending initialization command:', err);
             }
@@ -94,26 +146,13 @@ wss.on('connection', (ws) => {
           return;
         }
         
-        // Hexdump function for better debugging
-        const hexdump = (buffer) => {
-          const result = [];
-          for (let i = 0; i < Math.min(buffer.length, 128); i += 16) {
-            const chunk = buffer.slice(i, i + 16);
-            const hex = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ');
-            const printable = Array.from(chunk).map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.').join('');
-            result.push(`${i.toString(16).padStart(8, '0')}: ${hex.padEnd(48, ' ')} | ${printable}`);
-          }
-          return result.join('\n');
-        };
-        
-        // Print detailed hex dump for binary data
-        if (data.some(byte => (byte < 10 || (byte > 13 && byte < 32)) && byte !== 9)) {
-          console.log('Message contains binary data:');
-          console.log(hexdump(data));
+        // Skip handling binary data
+        if (isBinaryData(data)) {
+          console.log('Skipping binary data');
           return;
         }
         
-        // Convert buffer to string and trim
+        // Convert buffer to string and process
         const message = data.toString().trim();
         
         // Skip empty messages
@@ -122,32 +161,18 @@ wss.on('connection', (ws) => {
           return;
         }
         
-        // Log the message
-        console.log('Message as text:', message);
-        
-        // Strict JSON validation
-        if (message.startsWith('{') && message.endsWith('}')) {
-          try {
-            // Attempt to parse and validate JSON
-            const jsonObj = JSON.parse(message);
-            
-            // Only forward if it has request_type property
-            if (jsonObj && jsonObj.request_type) {
-              console.log('Valid JSON message with request_type:', jsonObj.request_type);
-              
-              // Forward to WebSocket client
-              if (ws.readyState === ws.OPEN) {
-                console.log('Forwarding valid JSON to WebSocket client');
-                ws.send(message);
-              }
-            } else {
-              console.log('JSON missing request_type property, not forwarding');
-            }
-          } catch (jsonError) {
-            console.error('Invalid JSON received from TCP server:', jsonError.message);
+        // Try to parse as JSON
+        const jsonObj = tryParseJSON(message);
+        if (jsonObj) {
+          console.log(`Valid JSON message with request_type: ${jsonObj.request_type}`);
+          pendingResponse = false;
+          
+          // Forward to WebSocket client
+          if (ws.readyState === ws.OPEN) {
+            ws.send(message);
           }
         } else {
-          console.log('Message is not a JSON object, not forwarding');
+          console.log('Invalid or non-JSON message, not forwarding');
         }
       } catch (error) {
         console.error('Error processing TCP data:', error);
@@ -187,20 +212,49 @@ wss.on('connection', (ws) => {
   tcpClient = connectToTcpServer();
   
   // Handle WebSocket messages and forward to TCP
-  ws.on('message', (message) => {
+  ws.on('message', async (message) => {
     try {
       const messageStr = message.toString();
       console.log('Received from WebSocket:', messageStr);
       
+      // Validate the message is proper JSON
+      const jsonObj = tryParseJSON(messageStr);
+      if (!jsonObj) {
+        console.log('Invalid JSON from WebSocket, not forwarding');
+        return;
+      }
+      
+      // Check if we should throttle requests
+      const now = Date.now();
+      if (now - lastRequestTime < 1000) { // Minimum 1 second between requests
+        console.log('Request throttled');
+        return;
+      }
+      
+      // Check if we're still waiting for a response
+      if (pendingResponse) {
+        console.log('Still waiting for previous response, skipping request');
+        return;
+      }
+      
       // Forward to TCP server if connected
       if (tcpClient && !tcpClient.destroyed) {
-        // Validate that the message is valid JSON before sending
         try {
-          JSON.parse(messageStr); // Just to validate
-          tcpClient.write(messageStr);
+          await safeTcpWrite(tcpClient, messageStr);
           console.log('Message sent to TCP server');
-        } catch (err) {
-          console.error('Invalid JSON from WebSocket client, not forwarding:', err.message);
+          lastRequestTime = now;
+          pendingResponse = true;
+          
+          // Set a timeout to clear pendingResponse if no response received
+          setTimeout(() => {
+            if (pendingResponse) {
+              console.log('Response timeout, resetting pending flag');
+              pendingResponse = false;
+            }
+          }, RESPONSE_TIMEOUT);
+        } catch (error) {
+          console.error('Error sending message to TCP server:', error);
+          pendingResponse = false;
         }
       } else {
         console.log('Cannot send message: TCP connection not available');
@@ -220,9 +274,9 @@ wss.on('connection', (ws) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 8888;
+const PORT = process.env.PORT || 7654;
 server.listen(PORT, () => {
-  console.log(`Advanced TCP-WebSocket proxy server running on port ${PORT}`);
+  console.log(`Improved TCP-WebSocket proxy server running on port ${PORT}`);
   console.log(`Proxying to TCP server at ${TCP_HOST}:${TCP_PORT}`);
 });
 
@@ -240,4 +294,4 @@ process.on('SIGINT', () => {
     console.log('Server shut down');
     process.exit(0);
   });
-}); 
+});

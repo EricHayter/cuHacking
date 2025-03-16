@@ -61,19 +61,19 @@ const ProcessTable = ({ data, loading, onGetDetails, onSuspendProcess, socket })
       field: "cpu_usage", 
       headerName: "CPU usage", 
       flex: 0.2,
-      valueFormatter: (params) => `${params.value.toFixed(1)}%`
+      valueFormatter: (params) => params.value !== undefined ? `${params.value.toFixed(1)}%` : '0.0%'
     },
     { 
       field: "ram_usage", 
       headerName: "RAM usage", 
       flex: 0.2,
-      valueFormatter: (params) => formatMemory(params.value)
+      valueFormatter: (params) => params.value !== undefined ? formatMemory(params.value) : '0 KB'
     },
     { 
       field: "uptime", 
       headerName: "Uptime", 
       flex: 0.7,
-      valueFormatter: (params) => formatUptime(params.value)
+      valueFormatter: (params) => params.value !== undefined ? formatUptime(params.value) : '0s'
     },
     { field: "user", headerName: "User", flex: 0.5 },
     {
