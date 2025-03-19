@@ -8,8 +8,31 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleLogin = () => {
+    setUsernameError('');
+    setPasswordError('');
+
+    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_.-]{2,31}$/; // Allow only letters, numbers, and underscores
+    if (!usernameRegex.test(username)) {
+      setUsernameError('Username must only contain letters, numbers, and underscores.');
+      return;
+    }
+    if (username.length < 3 || username.length > 20) {
+      setUsernameError('Username must be between 3 and 20 characters.');
+      return;
+    }
+
+    // Validate password
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/; 
+    // Password should be at least 8 characters long, include at least 1 letter, 1 number, and 1 special character
+    if (!passwordRegex.test(password)) {
+      setPasswordError('Password must be at least 8 characters long, include at least 1 letter, 1 number, and 1 special character.');
+      return;
+    }
+
     setIsLoading(true);
     // Simulate login process (replace with actual login logic)
     setTimeout(() => {
@@ -68,6 +91,8 @@ const LoginPage = () => {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           sx={{ mb: 2 }}
+          error={!!usernameError}
+          helperText={usernameError}
         />
 
         <TextField
@@ -78,6 +103,8 @@ const LoginPage = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           sx={{ mb: 4 }}
+          error={!!passwordError}
+          helperText={passwordError}
         />
 
         <Button

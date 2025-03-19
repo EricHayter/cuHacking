@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import './App.css';
 
 function App() {
+  localStorage.setItem('isAuthenticated', 'false');
   return (
     <Router>
       <Routes>
