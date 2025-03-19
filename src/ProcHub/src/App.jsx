@@ -1,25 +1,26 @@
-import React from "react";
-import DashboardPage from "./pages/DashboardPage";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import ProtectedRoute from './auth/ProtectedRoute';
+import DashboardPage from './pages/DashboardPage';
+import LoginPage from './pages/LoginPage';
+import './App.css';
 
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-  },
-  // typography: {
-  //   fontFamily: '"Courier New", monospace',
-  //   fontWeight: 'bold',
-  // },
-});
-
-const App = () => {
+function App() {
   return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <DashboardPage />
-    </ThemeProvider>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </Router>
   );
-};
+}
 
 export default App;

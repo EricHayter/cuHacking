@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../Documents/Coding/cuHacking"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"unistd.h": "c",
+			"proc_core.h": "c",
+			"partition.h": "c"
+		}
+	}
+}
