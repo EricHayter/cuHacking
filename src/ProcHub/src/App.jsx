@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import ProtectedRoute from './auth/ProtectedRoute';
+import ProtectedRoute from './components/ProtectedRoute';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import './App.css';
@@ -10,14 +10,9 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
+        <Route path="/" element={<ProtectedRoute>
               <DashboardPage />
-            </ProtectedRoute>
-          } 
-        />
+            </ProtectedRoute>} />
       </Routes>
     </Router>
   );
