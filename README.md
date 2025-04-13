@@ -6,7 +6,7 @@ An all-in-one process management app that helps users easily monitor processes r
 
 ## 🏆 Award-Winning Project
 
-This project won the **Best Use of QNX** award at [**cuHacking 6**](https://cuhacking.com/) (2025)!  
+This project won the **Best Use of QNX** award at **cuHacking 6**!
 Check out the full submission on [Devpost »](https://devpost.com/software/rpm-remote-process-monitor)
 
 ---
